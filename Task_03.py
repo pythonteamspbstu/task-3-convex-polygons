@@ -1,4 +1,5 @@
 import math
+import re
 from typing import List, Tuple
 
 class CPolygon:
@@ -7,6 +8,13 @@ class CPolygon:
         if not self.is_convex():
             print("Not a convex polygon")
     def is_convex(self) -> bool:
+        n = len(self.vertices)
+        if not self._has_consistent_orientation():
+            return False
+        if self._has_self_intersection():
+            return False
+        return True
+    def _has_consistent_orientation(self) -> bool:
         n = len(self.vertices)
         sign = None
         for i in range(n):
@@ -23,6 +31,49 @@ class CPolygon:
                 if cross_sign != sign:
                     return False
         return True
+
+    def _has_self_intersection(self) -> bool:
+        n = len(self.vertices)
+        for i in range(n):
+            a1 = self.vertices[i]
+            a2 = self.vertices[(i + 1) % n]
+            for j in range(i + 2, n):
+                if (j + 1) % n == i:
+                    continue
+                b1 = self.vertices[j]
+                b2 = self.vertices[(j + 1) % n]
+                if self._segments_intersect(a1, a2, b1, b2):
+                    return True
+        return False
+    def _orientation(self, p, q, r):
+        val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+        if val > 1e-10:
+            return 1
+        elif val < -1e-10:
+            return 2
+        return 0
+    def _on_segment(self, p, q, r):
+        if (min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and
+                min(p[1], r[1]) <= q[1] <= max(p[1], r[1])):
+            return True
+        return False
+    def _segments_intersect(self, p1, p2, p3, p4):
+        o1 = self._orientation(p1, p2, p3)
+        o2 = self._orientation(p1, p2, p4)
+        o3 = self._orientation(p3, p4, p1)
+        o4 = self._orientation(p3, p4, p2)
+        if o1 != o2 and o3 != o4:
+            return True
+        if o1 == 0 and self._on_segment(p1, p3, p2):
+            return True
+        if o2 == 0 and self._on_segment(p1, p4, p2):
+            return True
+        if o3 == 0 and self._on_segment(p3, p1, p4):
+            return True
+        if o4 == 0 and self._on_segment(p3, p2, p4):
+            return True
+        return False
+
     @staticmethod
     def cp(a1, o, a2) -> float:
         return (a1[0] - o[0]) * (a2[1] - o[1]) - (a1[1] - o[1]) * (a2[0] - o[0])
@@ -81,25 +132,19 @@ def is_polygon_convex(vertices: List[Tuple[float, float]]) -> bool:
 def get_vertexes():
     str = input("Задайте вершины многоугольника в формате \"(1, 2), (3, 4), (5, 6)\"\n");
     vertexes = []
-    x = 0
-    y = 0
-    partNum = 0 #0 - ждём '(', 1 - заполняем х, 2 - заполняем y.
-    for c in str:
-        if c == '(':
-            x = 0
-            y = 0
-            partNum = 1
-        elif c == ',' and partNum == 1:
-            partNum = 2
-        elif c == ')':
+    pattern = r'\(([^,]+),([^)]+)\)'
+    matches = re.findall(pattern, str)
+
+    for match in matches:
+        try:
+            x_str = match[0].strip()
+            y_str = match[1].strip()
+            x = float(x_str)
+            y = float(y_str)
             vertexes.append((x, y))
-            partNum = 0
-        elif partNum == 1 and c != ' ':
-            x *= 10
-            x += int(c)
-        elif partNum == 2 and c != ' ':
-            y *= 10
-            y += int(c)
+        except ValueError:
+            print(f"Ошибка парсинга координат: ({match[0]}, {match[1]})")
+            return None
 
     if len(vertexes) < 3:
         print("Ошибка: многоугольник должен иметь хотя бы 3 вершины")
@@ -108,7 +153,7 @@ def get_vertexes():
     if temp_polygon.is_convex():
         return vertexes
     else:
-        print("Ошибка: многоугольник не выпуклый! Пожалуйста, введите выпуклый многоугольник.")
+        print("Ошибка: многоугольник не выпуклый!!!!!")
         return None
     return vertexes
 
@@ -147,6 +192,7 @@ def sort_points(points):
         return math.atan2(point[1] - center_y, point[0] - center_x)
 
     return sorted(points, key=angle)
+
 
 def intersection(CPolygon1, CPolygon2):
 
